@@ -1,0 +1,28 @@
+Package: pmlsbp
+Title: Estimate spatial autoregressive nonlinear probit models with autoregressive disturbances
+Version: 0.0.0.9000
+Description: Estimate spatial autoregressive nonlinear probit models with autoregressive disturbances. The package allows the estimation of SAR and SARAR probit models using partial maximum likelihood estimation. Estimation and inference regarding marginal effects is also possible.
+License: GPL (>= 3)
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.2.3
+Suggests: 
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Imports: 
+    abind,
+    Matrix,
+    matrixcalc,
+    maxLik,
+    methods,
+    mvtnorm,
+    numDeriv,
+    qrng,
+    spatialreg,
+    spdep,
+    stats,
+    utils
+Author: Daniele Spinelli [aut, cre],
+  Anna Gloria Bille' [aut],
+  Samantha Leorato [aut]
+Maintainer: Daniele Spinelli <daniele.spinelli@unimib.it>
