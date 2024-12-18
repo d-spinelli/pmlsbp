@@ -24,7 +24,7 @@ group_matrices <- function(y,X,grouping=2, M=25e3, sim_type="mc" ) {
   groups
 }
 ################################f_sar
-f_sar <- function (rho_tilde,W,X,eig,qu=Inf,method_inv,  tol.solve= .Machine$double.eps) {
+f_sar <- function (rho_tilde,W,X,eig,qu=Inf,method_inv='solve',  tol.solve= .Machine$double.eps) {
   rho  <- to_natural(rho_tilde, eig$W )
   n <- dim(W)[1]
 
@@ -39,32 +39,42 @@ f_sar <- function (rho_tilde,W,X,eig,qu=Inf,method_inv,  tol.solve= .Machine$dou
                 dotSigma_rho=dotSigma_rho,dotX_rho=dotX_rho))
   }
 
-  if (method_inv=="solve") {
-    A <- as(diag(n)-rho*W,"CsparseMatrix")
-    Inv_rho <-  solve(A, tol=tol.solve)
-    #Inv_rho <-  solve(as(diag(n)-rho*W,"Matrix"), tol=tol.solve)
-    # Sigma_rho <- tcrossprod(Inv_rho)
-  }
-  else {
-    if (method_inv=="chol") {
-      A <- as(diag(n)-rho*W,"CsparseMatrix")
-      Inv_rho <- Matrix::chol2inv( chol(A))
-      # Sigma_rho <- tcrossprod(Inv_rho)
-      # Inv_Sigma <- crossprod(diag(n)-rho*W)
-      # Sigma_rho <-  Matrix::chol2inv(chol(as(Inv_Sigma,"CsparseMatrix")))
-      # Inv_rho <- tcrossprod(Sigma_rho,diag(n)-rho*W)
+  # if (method_inv=="solve") {
+  #   A <- as(diag(n)-rho*W,"CsparseMatrix")
+  #   Inv_rho <-  solve(A, tol=tol.solve)
+  #   #Inv_rho <-  solve(as(diag(n)-rho*W,"Matrix"), tol=tol.solve)
+  #   # Sigma_rho <- tcrossprod(Inv_rho)
+  # }
+  # else {
+  #   if (method_inv=="chol") {
+  #     A <- as(diag(n)-rho*W,"CsparseMatrix")
+  #     Inv_rho <- Matrix::chol2inv( chol(A))
+  #     # Sigma_rho <- tcrossprod(Inv_rho)
+  #     # Inv_Sigma <- crossprod(diag(n)-rho*W)
+  #     # Sigma_rho <-  Matrix::chol2inv(chol(as(Inv_Sigma,"CsparseMatrix")))
+  #     # Inv_rho <- tcrossprod(Sigma_rho,diag(n)-rho*W)
+  #   }
+  #   else {
+  #     Inv_rho <- addendum <-  diag(n)
+  #     for (k in 1:qu) #thanks fagiant
+  #     {
+  #       addendum <- rho*W%*%addendum
+  #       Inv_rho <- Inv_rho + addendum
+  #     }
+  #
+  #   }
+  # }
+  if ((method_inv %in% c('solve','chol'))) {
+    Inv_rho <- spatialreg::invIrW(x=W, rho=rho, method=method_inv ,feasible=T)
+  } else {
+    Inv_rho <- addendum <-  diag(n)
+    for (k in 1:qu) #thanks fagiant
+    {
+      addendum <- rho*W%*%addendum
+      Inv_rho <- Inv_rho + addendum
     }
-    else {
-      Inv_rho <- addendum <-  diag(n)
-      for (k in 1:qu) #thanks fagiant
-      {
-        addendum <- rho*W%*%addendum
-        Inv_rho <- Inv_rho + addendum
-      }
+  }
 
-    }
-  }
-  Inv_rho <- spatialreg::invIrW(x=W, rho=rho, method="solve" ,feasible=T)
         Sigma_rho <- tcrossprod(Inv_rho)
         Sigma_rho <- .5*(Sigma_rho + t(Sigma_rho))
   assign("my_result", list(Sigma_rho=Sigma_rho, rho=rho), envir = globalenv())

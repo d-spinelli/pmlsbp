@@ -90,7 +90,7 @@
 #' @references Bille', A. G., & Leorato, S. (2020). Partial ML estimation for spatial autoregressive nonlinear probit models with autoregressive disturbances. Econometric Reviews, 39(5), 437-475.
 #' @examples
 pmlsbp <- function(formula,data, model="SAR", grouping=2, W=NULL,zero.policy =spatialreg::get.ZeroPolicyOption(),
-                         M=NULL, formula_xlag=NULL, W2=NULL,  method_inv="chol",
+                         M=NULL, formula_xlag=NULL, W2=NULL,  method_inv="solve",
                          start=NULL, subset=NULL, na.action=na.fail,qu=Inf, iterlim=1000,
                          mvtnorm_control=list(M=25e3, sim_type="mc" , tol = .Machine$double.eps, fast = FALSE),
                          finalHessian=TRUE, method="bfgsr",print.level=2, vce.type=c("asy") , Conley=list(coords=NULL,LM=2),nBoot=1e3 , spectral=F, tol.solve= .Machine$double.eps, ...) {
