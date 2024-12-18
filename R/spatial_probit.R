@@ -93,7 +93,7 @@ pmlsbp <- function(formula,data, model="SAR", grouping=2, W=NULL,zero.policy =sp
                          M=NULL, formula_xlag=NULL, W2=NULL,  method_inv="chol",
                          start=NULL, subset=NULL, na.action=na.fail,qu=Inf, iterlim=1000,
                          mvtnorm_control=list(M=25e3, sim_type="mc" , tol = .Machine$double.eps, fast = FALSE),
-                         finalHessian=TRUE, method="bfgsr",print.level=2, vce.type=c("asy") , Conley=list(coords=NULL,LM=2),nBoot=1e3 , spectral=F, ...) {
+                         finalHessian=TRUE, method="bfgsr",print.level=2, vce.type=c("asy") , Conley=list(coords=NULL,LM=2),nBoot=1e3 , spectral=F, tol.solve= .Machine$double.eps, ...) {
   match.arg(model, c("SAR","SARAR"), several.ok = FALSE)
   match.arg(method_inv, c("chol","solve","fast"), several.ok = FALSE)
   stopifnot(is.numeric(qu))
@@ -246,12 +246,15 @@ pmlsbp <- function(formula,data, model="SAR", grouping=2, W=NULL,zero.policy =sp
   if (is.null(start)) {
     start <- suppressWarnings(glm(y~Xall-1, family = binomial(link = "probit"))$coefficients)
     names(start) <- colnames(Xall)
-    start <- c(start,-log(-eig$W[2]/eig$W[1])) #start rho=0
-#start <- c(start,0.2)
+
+   # start <- c(start,-log(-eig$W[2]/eig$W[1])) #start rho=0
+    start <- c(start,to_tilde(0, eig$W)[1])
+    #start <- c(start,0.2)
     #start <- c(start,2.4)
     names(start)[length(start)] <- "rho"
     if (model=="SARAR") {
-      start <- c(start,-log(-eig$M[2]/eig$M[1])) #start lambda=0
+      #start <- c(start,-log(-eig$M[2]/eig$M[1])) #start lambda=0
+      start <- c(start,to_tilde(0, eig$M)[1])
       names(start)[length(start)] <- "lambda"
     }
   }
@@ -298,6 +301,7 @@ pmlsbp <- function(formula,data, model="SAR", grouping=2, W=NULL,zero.policy =sp
      optimizer.call[[1L]] <- quote(maxLik::maxLik)
      optimizer.call$logLik <- ifelse(model=="SAR" ,quote(logLIK_SAR), quote(logLIK_SARAR))
      optimizer.call$start <- quote(start)
+     optimizer.call$tol.solve <-quote(tol.solve)
    } else {
      optimizer.call <- call[c(1L)]
      optimizer.call[[1L]] <- quote(minqa::bobyqa)
@@ -305,6 +309,7 @@ pmlsbp <- function(formula,data, model="SAR", grouping=2, W=NULL,zero.policy =sp
      #optimizer.call$feval <-quote(iterlim)
      optimizer.call$fn <- ifelse(model=="SAR" ,quote(logLIK_SAR), quote(logLIK_SARAR))
      optimizer.call$bobyqa <- quote(TRUE)
+     optimizer.call$control <- quote(list(iprint=print.level , maxfun=iterlim) )
    }
 
    optimizer.call$X <-  quote(Xall)
@@ -322,10 +327,12 @@ pmlsbp <- function(formula,data, model="SAR", grouping=2, W=NULL,zero.policy =sp
      return$code<- return$ierr
      return$estimate <- return$par
    }
-   if (return$code!=0) {
-     cat(paste0("converge not achieved: ",return$message))
-     return(NULL)
-   }
+   # if (return$code!=0) {
+   #   cat("----------------------------------------------\n WARNING \n")
+   #   cat(paste0("converge not achieved: ",return$message,"\n"))
+   #   cat("----------------------------------------------\n")
+   #   return(NULL)
+   # }
 
   return$groups <- groups
   return$start <- start
@@ -354,9 +361,14 @@ pmlsbp <- function(formula,data, model="SAR", grouping=2, W=NULL,zero.policy =sp
     G <- diag(c(rep(1,length(return$estimate)-2), attr(return$rho,"jacobian"), attr(return$lambda,"jacobian")))
   }
 
-
   ##maxlik uses rho_tilde for the maximization problem, to obtain the standard error the gradient must be adjusted to work with rho using the cain rule
-
+if (method=='bobyqa') {
+  return$gradientObs<-attr(obFun, 'gradient')
+  return$hessian <- quote(-numericHessian(fn, t0=return$estimate, X=Xall, y = y, eig = eig, W = W, qu = qu, method_inv = method_inv,
+                                    groups = groups, mvtnorm_control = mvtnorm_control, bobyqa=T))
+  return$hessian[[2]][[2]] <- obFun.call[[1]]
+  return$hessian<- eval(return$hessian)
+}
   invH <- solve(as(return$hessian,"Matrix")) ##### devo tirare fuori hessiano
   V <-  list()
   if ("asy" %in% vce.type) {

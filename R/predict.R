@@ -80,7 +80,9 @@ predict.me.pmlsprobit<- function(mod, variables=NULL, delta.method=T) {
 
 
   }
-  list(Indiv=f, Direct=me.direct, Indirect=me.indirect, Total=me.total)
+  list(
+    #Indiv=f,
+     Direct=me.direct, Indirect=me.indirect, Total=me.total)
 }
 
 ############# predict xb
@@ -234,7 +236,9 @@ predict.me.factor.pmlsprobit.v2 <- function(mod, variables=NULL, delta.method=F)
     attr(me.indirect,"se") <- se.total
   }
   #
-  list(Indiv=f, Direct=me.direct, Indirect=me.indirect, Total=me.total)
+  list(
+    #Indiv=f,
+    Direct=me.direct, Indirect=me.indirect, Total=me.total)
 
 }
 
@@ -406,7 +410,9 @@ predict.me.numeric.pmlsprobit.v2 <- function(mod, variables=NULL, delta.method=T
     attr(me.total,"se") <- se.indirect
     attr(me.indirect,"se") <- se.total
   }
-  ret <- list(Indiv=f , Direct=me.direct, Indirect=me.indirect, Total=me.total)
+  ret <- list(
+    #Indiv=f ,
+    Direct=me.direct, Indirect=me.indirect, Total=me.total)
   ret
 }
 
@@ -460,8 +466,9 @@ print.ape.pmlsprobit<-function(ape, digits = max(3, getOption("digits") - 3)) {
     }
 }
 
+
+#' @describeIn Predicted values based on pmlsprobit object
 #' @export
-print.pe.pmlsprobit<-function(pe) {
-  attr(pe, "class") <- NULL
-  print.default(pe)
+print.pe.pmlsprobit<-function(pe, digits = max(3, getOption("digits") - 3)) {
+lapply(pe, print.default, digits=digits)
 }
