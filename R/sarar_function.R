@@ -2,33 +2,40 @@ f_sarar <- function (rho_tilde,lambda_tilde,W,M,X,eig,qu=Inf,method_inv="solve")
   rho  <- eig$W[1]^(-1) + ((eig$W[2]^(-1)-eig$W[1]^(-1))/(1+exp(-rho_tilde)))
   lambda  <- eig$M[1]^(-1) + ((eig$M[2]^(-1)-eig$M[1]^(-1))/(1+exp(-lambda_tilde)))
   n<-dim(W)[1]
-  if (method_inv=="solve") {
-    Inv_rho <- solve(diag(n)-rho*W)
-    Inv_lambda <- solve(diag(n)-lambda*M)
-    Sigma_rho <- tcrossprod(Inv_rho%*%Inv_lambda)
-  }
-  else {
-    if (method_inv=="chol") {
-      Inv_Sigma <- crossprod(diag(n)-rho*W-lambda*M+rho*lambda*M%*%W)
-      Sigma_rho <- chol2inv(chol(as(Inv_Sigma,"CsparseMatrix")))
-      S_rho <- crossprod(diag(n)-rho*W)
-      Inv_rho <- chol2inv(chol(as(S_rho,"CsparseMatrix")))%*%(diag(n)-rho*W)
-      S_lambda <- crossprod(diag(n)-lambda*M)
-      Inv_lambda <- chol2inv(chol(as(S_lambda,"CsparseMatrix")))%*%(diag(n)-lambda*M)
 
+  if ((method_inv %in% c('solve','chol'))) {
+    Inv_rho    <- spatialreg::invIrW(x=W, rho=rho, method=method_inv ,feasible=T)
+    Inv_lambda <- spatialreg::invIrW(x=M, rho=lambda, method=method_inv ,feasible=T)
+  }     else {
+    Inv_rho <- Inv_lambda <- addendum_rho <- addendum_lambda  <-  diag(n)
+    for (k in 1:qu) #thanks fagiant
+    {
+      addendum_rho <- rho*W%*%addendum_rho
+      Inv_rho <- Inv_rho + addendum_rho
+      addendum_lambda <- lambda*M%*%addendum_lambda
+      Inv_lambda <- Inv_lambda + addendum_lambda
     }
-    else {
-      Inv_rho <- Inv_lambda <- addendum_rho <- addendum_lambda  <-  diag(n)
-      for (k in 1:qu) #thanks fagiant
-      {
-        addendum_rho <- rho*W%*%addendum_rho
-        Inv_rho <- Inv_rho + addendum_rho
-        addendum_lambda <- lambda*M%*%addendum_lambda
-        Inv_lambda <- Inv_lambda + addendum_lambda
-      }
-      Sigma_rho <- tcrossprod(Inv_rho%*%Inv_lambda)
-    }
+
   }
+  Sigma_rho <- tcrossprod(Inv_rho%*%Inv_lambda)
+  Sigma_rho <- (Sigma_rho + t(Sigma_rho))*.5
+  # if (method_inv=="solve") {
+  #   Inv_rho <- solve(diag(n)-rho*W)
+  #   Inv_lambda <- solve(diag(n)-lambda*M)
+  #   Sigma_rho <- tcrossprod(Inv_rho%*%Inv_lambda)
+  # }
+  # else {
+  #   if (method_inv=="chol") {
+  #     Inv_Sigma <- crossprod(diag(n)-rho*W-lambda*M+rho*lambda*M%*%W)
+  #     Sigma_rho <- chol2inv(chol(as(Inv_Sigma,"CsparseMatrix")))
+  #     S_rho <- crossprod(diag(n)-rho*W)
+  #     Inv_rho <- chol2inv(chol(as(S_rho,"CsparseMatrix")))%*%(diag(n)-rho*W)
+  #     S_lambda <- crossprod(diag(n)-lambda*M)
+  #     Inv_lambda <- chol2inv(chol(as(S_lambda,"CsparseMatrix")))%*%(diag(n)-lambda*M)
+  #
+  #   }
+  #
+
   dotSigma_rho <- Inv_rho %*% W %*% Sigma_rho
   dotSigma_rho <- dotSigma_rho + t(dotSigma_rho)
   dotSigma_lambda=matrix(0,n,n)

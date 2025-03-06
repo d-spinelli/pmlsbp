@@ -93,7 +93,7 @@ pmlsbp <- function(formula,data, model="SAR", grouping=2, W=NULL,zero.policy =sp
                          M=NULL, formula_xlag=NULL, W2=NULL,  method_inv="solve",
                          start=NULL, subset=NULL, na.action=na.fail,qu=Inf, iterlim=1000,
                          mvtnorm_control=list(M=25e3, sim_type="mc" , tol = .Machine$double.eps, fast = FALSE),
-                         finalHessian=TRUE, method="bfgsr",print.level=2, vce.type=c("asy") , Conley=list(coords=NULL,LM=2),nBoot=1e3 , spectral=F, tol.solve= .Machine$double.eps, ...) {
+                         finalHessian=TRUE, method="bhhh",print.level=2, vce.type='asy' , Conley=list(coords=NULL,LM=2),nBoot=1e3 , spectral=F, tol.solve= .Machine$double.eps, version=0, ...) {
   match.arg(model, c("SAR","SARAR"), several.ok = FALSE)
   match.arg(method_inv, c("chol","solve","fast"), several.ok = FALSE)
   stopifnot(is.numeric(qu))
@@ -247,13 +247,9 @@ pmlsbp <- function(formula,data, model="SAR", grouping=2, W=NULL,zero.policy =sp
     start <- suppressWarnings(glm(y~Xall-1, family = binomial(link = "probit"))$coefficients)
     names(start) <- colnames(Xall)
 
-   # start <- c(start,-log(-eig$W[2]/eig$W[1])) #start rho=0
     start <- c(start,to_tilde(0, eig$W)[1])
-    #start <- c(start,0.2)
-    #start <- c(start,2.4)
     names(start)[length(start)] <- "rho"
     if (model=="SARAR") {
-      #start <- c(start,-log(-eig$M[2]/eig$M[1])) #start lambda=0
       start <- c(start,to_tilde(0, eig$M)[1])
       names(start)[length(start)] <- "lambda"
     }
@@ -269,39 +265,18 @@ pmlsbp <- function(formula,data, model="SAR", grouping=2, W=NULL,zero.policy =sp
 
  groups <- group_matrices(y,Xall,grouping, M=mvtnorm_control$M, sim_type= mvtnorm_control$sim_type)
 
-  # m.maxlik <- match(c("method", "iterlim","tol","reltol","gradtol", "steptol","lambdatol","qac",
-  #                   "qrtol", "marquardt_lambda0", "marquardt_lambdaStep" , "marquardt_maxLambda"  , "print.level" ,
-  #                   "nm_alpha", "nm_beta", "nm_gamma", "sann_cand", "sann_temp","sann_tmax","sann_randomSeed","finalHessian","constraints" ), names(call), 0L)
-  # maxlik.call <- call[c(1L,m.maxlik)]
-  # maxlik.call[[1L]] <- quote(maxLik)
-  #
-  #
-  # maxlik.call$logLik <- ifelse(model=="SAR" ,quote(logLIK_SAR), quote(logLIK_SARAR))
-  # maxlik.call$start <- quote(start)
-  # maxlik.call$X <-  quote(Xall)
-  # maxlik.call$y <-  quote(y)
-  # maxlik.call$eig <-  quote(eig)
-  # maxlik.call$W <-  quote(W)
-  # maxlik.call$qu <-  quote(qu)
-  # maxlik.call$method_inv <- quote(method_inv)
-  # maxlik.call$groups <- quote(groups)
-  # maxlik.call$mvtnorm_control <-  quote(mvtnorm_control)
-  # if (model!="SAR")
-  #   maxlik.call$M <- quote(M)
-  # return <- eval(maxlik.call)
-  # if (return$code!=0) {
-  #   cat(paste0("converge not achieved: ",return$message))
-  #   return(NULL)
-  # }
    if (method!="bobyqa") {
      m.maxlik <- match(c("method", "iterlim","tol","reltol","gradtol", "steptol","lambdatol","qac",
                          "qrtol", "marquardt_lambda0", "marquardt_lambdaStep" , "marquardt_maxLambda"  , "print.level" ,
                          "nm_alpha", "nm_beta", "nm_gamma", "sann_cand", "sann_temp","sann_tmax","sann_randomSeed","finalHessian","constraints" ), names(call), 0L)
      optimizer.call <- call[c(1L,m.maxlik)]
      optimizer.call[[1L]] <- quote(maxLik::maxLik)
-     optimizer.call$logLik <- ifelse(model=="SAR" ,quote(logLIK_SAR), quote(logLIK_SARAR))
+     if (version==0 & grouping==2 & nrow(W)%%2==0 )
+       optimizer.call$logLik <- ifelse(model=="SAR" ,quote(logLIK_SAR3), quote(logLIK_SARAR))
+     else
+       optimizer.call$logLik <- ifelse(model=="SAR" ,quote(logLIK_SAR), quote(logLIK_SARAR))
      optimizer.call$start <- quote(start)
-     optimizer.call$tol.solve <-quote(tol.solve)
+     #optimizer.call$tol.solve <-quote(tol.solve)
    } else {
      optimizer.call <- call[c(1L)]
      optimizer.call[[1L]] <- quote(minqa::bobyqa)
@@ -323,6 +298,10 @@ pmlsbp <- function(formula,data, model="SAR", grouping=2, W=NULL,zero.policy =sp
    if (model!="SAR")
      optimizer.call$M <- quote(M)
    return <- eval(optimizer.call)
+   # browser()
+
+   return$rho <- to_natural(tail(return$estimate,1), eig$W )
+  ## return(return)
    if (method=="bobyqa") {
      return$code<- return$ierr
      return$estimate <- return$par
@@ -342,6 +321,8 @@ pmlsbp <- function(formula,data, model="SAR", grouping=2, W=NULL,zero.policy =sp
   obFun.call <- optimizer.call[c(1L,m.obFun)]
   obFun.call[[1L]] <- ifelse(model=="SAR" ,quote(logLIK_SAR), quote(logLIK_SARAR))
   obFun.call$theta <- quote(return$estimate)
+
+
   obFun <- eval(obFun.call)
 
   return$beta <- return$estimate[1:ncol(Xall)]
@@ -413,7 +394,7 @@ if (method=='bobyqa') {
   colnames(V) <- rownames(V) <- names(return$estimate)
   return$vcov <- V
   attr(return$vcov,"type") <- vce.type
-
+  return$eig<-eig
   return$f <- attr(obFun, "f")
   return$model.type <- model
   return$slx <- !is.null(formula_xlag)
@@ -429,7 +410,7 @@ if (method=='bobyqa') {
   }
   return$call <- call
 
-  keep.results <- c('beta','estimate','call','rho','code','f','maximum','message','model','model.type','slx','start','terms','vcov','W')
+  keep.results <- c('beta','estimate','call','rho','code','f','maximum','message','model','model.type','slx','start','terms','vcov','W', 'eig')
   if (!is.null(formula_xlag))  keep.results <- c(keep.results, 'W2','terms.xlag')
   if (model=="SARAR") keep.results <- c(keep.results,'M','lambda')
   ret<-return[keep.results]

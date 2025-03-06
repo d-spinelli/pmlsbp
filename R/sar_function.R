@@ -24,7 +24,7 @@ group_matrices <- function(y,X,grouping=2, M=25e3, sim_type="mc" ) {
   groups
 }
 ################################f_sar
-f_sar <- function (rho_tilde,W,X,eig,qu=Inf,method_inv='solve',  tol.solve= .Machine$double.eps) {
+f_sar <- function (rho_tilde,W,X,eig,qu=Inf,method_inv='solve') {
   rho  <- to_natural(rho_tilde, eig$W )
   n <- dim(W)[1]
 
@@ -65,6 +65,7 @@ f_sar <- function (rho_tilde,W,X,eig,qu=Inf,method_inv='solve',  tol.solve= .Mac
   #   }
   # }
   if ((method_inv %in% c('solve','chol'))) {
+
     Inv_rho <- spatialreg::invIrW(x=W, rho=rho, method=method_inv ,feasible=T)
   } else {
     Inv_rho <- addendum <-  diag(n)
@@ -77,7 +78,7 @@ f_sar <- function (rho_tilde,W,X,eig,qu=Inf,method_inv='solve',  tol.solve= .Mac
 
         Sigma_rho <- tcrossprod(Inv_rho)
         Sigma_rho <- .5*(Sigma_rho + t(Sigma_rho))
-  assign("my_result", list(Sigma_rho=Sigma_rho, rho=rho), envir = globalenv())
+#  assign("my_result", list(Sigma_rho=Sigma_rho, rho=rho), envir = globalenv())
   jacob <- ((eig$W[2]^(-1)-eig$W[1]^(-1))*exp(-rho_tilde))/((1+exp(-rho_tilde))^2) ##derivative of rho wrt rho tilde
   dotSigma_rho <- jacob * Inv_rho %*% W %*% Sigma_rho #now this is expressed as a function of rho tilde (chain rule)
   dotSigma_rho <- dotSigma_rho + t(dotSigma_rho)
@@ -88,15 +89,13 @@ f_sar <- function (rho_tilde,W,X,eig,qu=Inf,method_inv='solve',  tol.solve= .Mac
 
 }
 
-
 logLIK_SAR <- function(theta,y,W,X,eig,qu=Inf,method_inv="solve", groups,
-                       mvtnorm_control=list(M=25e3, tol = .Machine$double.eps, fast = FALSE), bobyqa=F,
-                       tol.solve= .Machine$double.eps) {
+                       mvtnorm_control=list(M=25e3, tol = .Machine$double.eps, fast = FALSE), bobyqa=F) {
 
   beta <- theta[ - length(theta)  ]
   rho_tilde <- tail(theta,1)
 
-  f_rho <-  f_sar(rho_tilde,W,X,eig,qu,method_inv, tol.solve)
+  f_rho <-  f_sar(rho_tilde,W,X,eig,qu,method_inv)
   Sigma <- f_rho$Sigma_rho
   xb <- f_rho$X_rho%*%beta
   y_list <- split(y,groups$y)
@@ -105,7 +104,7 @@ logLIK_SAR <- function(theta,y,W,X,eig,qu=Inf,method_inv="solve", groups,
 
   X_rho_list <- lapply(split( f_rho$X_rho, groups$X), function(x) matrix(x, ncol=ncol(X)) )
   xb_list <- split(xb, groups$y)
-
+  assign("theta", theta, envir = globalenv())
   Sigma_list <- lapply(split(f_rho$Sigma_rho, groups$Sigma)[-1],
                        function(x) matrix(x, ncol=sqrt(length(x))))
   dotSigma_list <- lapply(split(f_rho$dotSigma_rho, groups$Sigma)[-1],
@@ -116,11 +115,12 @@ logLIK_SAR <- function(theta,y,W,X,eig,qu=Inf,method_inv="solve", groups,
   score <- ll[,-1]
   ll <- ll[,1]
   attr(ll,"f")  <- f_rho
-  if (!bobyqa) {
+    if (!bobyqa) {
     attr(ll,"gradient") <-  -score
     return(ll)
   } else
     return(-sum(ll))
+
 }
 
 logLIK_g_SAR <- function(xb,Sigma,y,  X_rho ,dotXb_rho, dotSigma, simw,
@@ -130,7 +130,7 @@ logLIK_g_SAR <- function(xb,Sigma,y,  X_rho ,dotXb_rho, dotSigma, simw,
   lower <- -upper
   upper[y==0] <- -xb[y==0]
   lower[y==1] <- -xb[y==1]
-  Sigma <- .5*(Sigma  + t(Sigma) )+
+  Sigma <- .5*(Sigma  + t(Sigma) )
   assign("Sigma", Sigma, envir = globalenv())
   # if (!matrixcalc::is.positive.definite(Sigma, tol=1e-8)) {
   #   #Sigma <- Matrix::nearPD(Sigma, ensureSymmetry = T)$mat
@@ -152,6 +152,7 @@ logLIK_g_SAR <- function(xb,Sigma,y,  X_rho ,dotXb_rho, dotSigma, simw,
 
   score_rho <- t(mvtnorm::Lower_tri(p$chol, diag = T))%*%dC_dSigma%*%dotSigma[lower.tri(dotSigma,diag=T)]
   c(p$logLik, score_beta,score_rho1-score_rho)
+
 }
 
 
